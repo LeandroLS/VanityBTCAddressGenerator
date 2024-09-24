@@ -60,9 +60,9 @@ class VanityAddressGenerator
                 };
 
                 count++;
-
+                Console.WriteLine($"Address: {address} Prefix: {prefix}");
                 // Verifica se o endereço começa com o prefixo desejado
-                if (address.StartsWith(prefix))
+                if (address.ToLower().StartsWith(prefix.ToLower()))
                 {
                     // Bloqueia a execução de outras threads e marca o endereço como encontrado
                     lock (lockObj)
