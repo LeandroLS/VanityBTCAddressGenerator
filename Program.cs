@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using NBitcoin;
 
@@ -39,6 +40,21 @@ class VanityAddressGenerator
         var startTime = DateTime.Now;
         var found = false; // Flag para indicar quando um endereço foi encontrado
         var lockObj = new object(); // Objeto para controle de sincronização
+        long totalAttempts = 0; // Contador global de tentativas
+
+        // Timer para atualizar a quantidade de verificações por segundo
+        Timer timer = new Timer(state =>
+        {
+            lock (lockObj)
+            {
+                double elapsedSeconds = (DateTime.Now - startTime).TotalSeconds;
+                double attemptsPerSecond = totalAttempts / elapsedSeconds;
+                Console.Clear(); // Limpa o console
+                Console.WriteLine($"Procurando por prefixo: {prefix}");
+                Console.WriteLine($"Total de chaves privadas verificadas: {totalAttempts}");
+                Console.WriteLine($"Velocidade: {attemptsPerSecond:F2} chaves por segundo");
+            }
+        }, null, 0, 1000); // Atualiza a cada 1000 ms (1 segundo)
 
         // Usar Parallel.For para paralelismo
         Parallel.For(0, Environment.ProcessorCount / 2, (i, state) =>
@@ -60,7 +76,8 @@ class VanityAddressGenerator
                 };
 
                 count++;
-                Console.WriteLine($"Address: {address} Prefix: {prefix}");
+                Interlocked.Increment(ref totalAttempts); // Incrementa o contador global de forma segura
+
                 // Verifica se o endereço começa com o prefixo desejado
                 if (address.ToLower().StartsWith(prefix.ToLower()))
                 {
@@ -71,7 +88,8 @@ class VanityAddressGenerator
                         {
                             found = true; // Sinaliza que um endereço foi encontrado
                             var duration = DateTime.Now - startTime;
-                            Console.WriteLine($"Endereço encontrado após {count} tentativas em {duration.TotalSeconds} segundos.");
+                            Console.Clear();
+                            Console.WriteLine($"Endereço encontrado após {totalAttempts} tentativas em {duration.TotalSeconds} segundos.");
                             Console.WriteLine($"Endereço Bitcoin: {address}");
                             Console.WriteLine($"Chave Privada (WIF): {privateKey.GetWif(Network.Main)}");
                             // Para todas as outras threads
@@ -79,12 +97,10 @@ class VanityAddressGenerator
                         }
                     }
                 }
-
-                if (count % 1000 == 0 && !found)
-                {
-                    Console.WriteLine($"Thread {i}: {count} tentativas realizadas...");
-                }
             }
         });
+
+        // Finaliza o timer
+        timer.Dispose();
     }
 }
